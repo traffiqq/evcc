@@ -150,7 +150,7 @@ func TestPvScalePhases(t *testing.T) {
 
 		attachListeners(t, lp)
 
-		lp.measuredPhases = tc.measuredPhases
+		lp.setMeasuredPhases(tc.measuredPhases)
 		if tc.measuredPhases > 0 && tc.vehicle > 0 {
 			t.Fatalf("%v invalid test case", tc)
 		}
@@ -185,7 +185,7 @@ func TestPvScalePhases(t *testing.T) {
 
 			// reset to initial state
 			lp.SetPhases(tc.physical)
-			lp.measuredPhases = tc.measuredPhases
+			lp.setMeasuredPhases(tc.measuredPhases)
 
 			plainCharger.EXPECT().Enable(false).Return(nil).MaxTimes(1)
 			phaseCharger.EXPECT().Phases1p3p(3).Return(nil).MaxTimes(1)
