@@ -718,14 +718,6 @@ func (lp *LoadPoint) climateActive() bool {
 	return false
 }
 
-// remoteControlled returns true if remote control status is active
-func (lp *LoadPoint) remoteControlled(demand loadpoint.RemoteDemand) bool {
-	lp.Lock()
-	defer lp.Unlock()
-
-	return lp.remoteDemand == demand
-}
-
 // identifyVehicle reads vehicle identification from charger
 func (lp *LoadPoint) identifyVehicle() {
 	identifier, ok := lp.charger.(api.Identifier)
@@ -994,6 +986,7 @@ func (lp *LoadPoint) setPhases(phases int) {
 		lp.Unlock()
 
 		lp.publish("phases", lp.Phases)
+		// TODO sync phase timer
 		lp.publishTimer(phaseTimer, 0, timerInactive)
 
 		lp.resetMeasuredPhases()
@@ -1470,7 +1463,7 @@ func (lp *LoadPoint) Update(sitePower float64, cheap bool, batteryBuffered bool)
 		lp.socTimer.Reset() // once SoC is reached, the target charge request is removed
 
 	// OCPP has priority over target charging
-	case lp.remoteControlled(loadpoint.RemoteHardDisable):
+	case lp.getRemoteDemand() == loadpoint.RemoteHardDisable:
 		remoteDisabled = loadpoint.RemoteHardDisable
 		fallthrough
 
@@ -1516,7 +1509,7 @@ func (lp *LoadPoint) Update(sitePower float64, cheap bool, batteryBuffered bool)
 		}
 
 		// Sunny Home Manager
-		if lp.remoteControlled(loadpoint.RemoteSoftDisable) {
+		if lp.getRemoteDemand() == loadpoint.RemoteSoftDisable {
 			remoteDisabled = loadpoint.RemoteSoftDisable
 			targetCurrent = 0
 			required = true
