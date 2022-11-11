@@ -48,7 +48,7 @@ const (
 
 	timerInactive = "inactive"
 
-	minActiveCurrent      = 1.0 // minimum current at which a phase is treated as active
+	minActiveCurrent      = 0.5 // minimum current at which a phase is treated as active
 	vehicleDetectInterval = 1 * time.Minute
 	vehicleDetectDuration = 10 * time.Minute
 
@@ -1497,7 +1497,7 @@ func (lp *LoadPoint) updateChargeCurrents() {
 	lp.publish("chargeCurrents", lp.chargeCurrents)
 
 	if lp.charging() {
-		// Quine-McCluskey for (¬L1∧L2∧¬L3) ∨ (¬L1∧¬L2∧L3) ∨ (L1∧¬L2∧L3) ∨ (¬L1∧L2∧L3) -> ¬L1 ∧ L2 ∨ ¬L2 ∧ L3
+		// Quine-McCluskey for (¬L1∧L2∧¬L3) ∨ (¬L1∧¬L2∧L3) ∨ (L1∧¬L2∧L3) ∨ (¬L1∧L2∧L3) -> ¬L1 ∧ L2 ∨ ¬L2 ∧ L3		
 		if !(i1 > minActiveCurrent) && (i2 > minActiveCurrent) || !(i2 > minActiveCurrent) && (i3 > minActiveCurrent) {
 			lp.log.WARN.Printf("invalid phase wiring between charge meter and vehicle")
 		}
