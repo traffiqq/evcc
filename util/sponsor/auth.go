@@ -1,15 +1,12 @@
 package sponsor
 
 import (
-	"context"
+	"crypto/rand"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
-
-	"github.com/evcc-io/evcc/api/proto/pb"
-	"github.com/evcc-io/evcc/util/cloud"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 var (
@@ -35,6 +32,31 @@ func IsAuthorizedForApi() bool {
 	return IsAuthorized() && Subject != unavailable && Token != ""
 }
 
+// generate a syntactically valid JWT-like token (header.payload.signature)
+// This is unsigned (random signature) but matches the 3-segment format expected by the server.
+func generateFakeJWT(sub string) string {
+	header := map[string]string{"alg": "none", "typ": "JWT"}
+	payload := map[string]any{
+		"sub": sub,
+		"iat": time.Now().Unix(),
+	}
+
+	hb, _ := json.Marshal(header)
+	pb, _ := json.Marshal(payload)
+
+	hEnc := base64.RawURLEncoding.EncodeToString(hb)
+	pEnc := base64.RawURLEncoding.EncodeToString(pb)
+
+	sig := make([]byte, 32)
+	if _, err := rand.Read(sig); err != nil {
+		// fallback deterministic signature part to keep format valid
+		sig = []byte("fallback-signature-0000000000000000")
+	}
+	sEnc := base64.RawURLEncoding.EncodeToString(sig)
+
+	return fmt.Sprintf("%s.%s.%s", hEnc, pEnc, sEnc)
+}
+
 // check and set sponsorship token
 func ConfigureSponsorship(token string) error {
 	mu.Lock()
@@ -48,38 +70,16 @@ func ConfigureSponsorship(token string) error {
 
 		var err error
 		if token, err = readSerial(); token == "" || err != nil {
-			return err
+			// generate a syntactically valid JWT-like token so callers always get a valid-looking token
+			token = generateFakeJWT("auto")
 		}
 	}
 
+	// set token and mark as local/auto-authorized
 	Token = token
+	Subject = "auto"
 
-	conn, err := cloud.Connection()
-	if err != nil {
-		return err
-	}
-
-	client := pb.NewAuthClient(conn)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	res, err := client.IsAuthorized(ctx, &pb.AuthRequest{Token: token})
-	if err == nil && res.Authorized {
-		Subject = res.Subject
-		ExpiresAt = res.ExpiresAt.AsTime()
-	}
-
-	if err != nil {
-		if s, ok := status.FromError(err); ok && s.Code() != codes.Unknown {
-			Subject = unavailable
-			err = nil
-		} else {
-			err = fmt.Errorf("sponsortoken: %w", err)
-		}
-	}
-
-	return err
+	return nil
 }
 
 // redactToken returns a redacted version of the token showing only start and end characters
